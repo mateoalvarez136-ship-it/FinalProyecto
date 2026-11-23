@@ -232,7 +232,7 @@ Crea `.dockerignore` en la raíz. Su trabajo es impedir que entren a la imagen a
 ### 4.3 Construye la imagen
 
 ```bash
-docker build -t pronostico .
+docker build -t pronostico-consumo .
 ```
 
 La primera vez tarda 1–3 minutos. Si cambias solo el frontend y vuelves a construir, debe tardar segundos. Fíjate en cuáles pasos dicen `CACHED`.
@@ -240,9 +240,14 @@ La primera vez tarda 1–3 minutos. Si cambias solo el frontend y vuelves a cons
 ### 4.4 Ejecuta el contenedor
 
 ```bash
-docker run --rm -p 8000:8000 \
-  -e INFLUX_URL -e INFLUX_TOKEN -e INFLUX_ORG -e INFLUX_BUCKET \
-  pronostico
+docker run -d --name pronostico-consumo -p 8000:8000 \
+  -e INFLUX_URL="$INFLUX_URL" \
+  -e INFLUX_TOKEN="$INFLUX_TOKEN" \
+  -e INFLUX_ORG="$INFLUX_ORG" \
+  -e INFLUX_BUCKET="$INFLUX_BUCKET" \
+  -e INFLUX_MEASUREMENT="$INFLUX_MEASUREMENT" \
+  -e INFLUX_FIELD="$INFLUX_FIELD" \
+  pronostico-consumo
 ```
 
 - `-p 8000:8000` conecta el puerto del contenedor con el del Codespace. Sin esto, la app corre pero nadie la ve.
@@ -263,14 +268,19 @@ Compara el **CONTAINER ID** con el campo `atendido_por` de `/api/salud`. Deben s
 Verifica también que tu imagen **no contiene credenciales**. Estos dos comandos no deben mostrar ni el token ni un archivo `.env`:
 
 ```bash
-docker run --rm pronostico env | grep -i influx
-docker run --rm pronostico ls -a /app
+if docker image inspect pronostico-consumo --format '{{json .Config.Env}}' | grep -q 'INFLUX_TOKEN'; then
+  echo "REVISAR: la imagen contiene INFLUX_TOKEN"
+else
+  echo "OK: la imagen no tiene INFLUX_TOKEN"
+fi
+
+docker run --rm --entrypoint sh pronostico-consumo -c 'test ! -e /app/.env && echo "OK: no hay archivo .env dentro de la imagen"'
 ```
 
 Sube tus archivos:
 
 ```bash
-git add Dockerfile .dockerignore
+git add Dockerfile .dockerignore README.md
 git commit -m "Contenerización del servicio"
 git push
 ```
