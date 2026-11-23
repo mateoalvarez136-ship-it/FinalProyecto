@@ -1,63 +1,643 @@
-<!doctype html>
+
+<!DOCTYPE html>
 <html lang="es">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Pronóstico</title>
-<!--
-  ESQUELETO DEL FRONTEND
-  ======================
-  Esta página ya funciona: pide el pronóstico a la API y lo muestra en una
-  tabla sin formato. Tu trabajo es convertirla en una interfaz de verdad.
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Energy Forecast | Monitor de consumo</title>
 
-  Requisitos mínimos (ver README, Fase 2):
-    1. Una gráfica con el histórico, el pronóstico y el intervalo de confianza.
-    2. Las horas en hora de Colombia (la API las entrega en UTC, con "Z").
-    3. Al menos un indicador destacado (p.ej. valor de la próxima hora,
-       máximo esperado, hora del último dato).
-    4. Controles para elegir cuántas horas pronosticar.
-    5. Un mensaje claro cuando la API responde con error.
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
-  Puedes usar cualquier librería de gráficas cargada desde un CDN
-  (Chart.js, Plotly, ECharts...) y poner archivos .css o .js en esta misma
-  carpeta: se sirven en /static/<nombre>.
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
 
-  Endpoints disponibles (pruébalos en /docs):
-    GET /api/prediccion?horas=12&historia=48&confianza=0.95
-    GET /api/historico?horas=48
-    GET /api/modelo
-    GET /api/salud
--->
+    body {
+      font-family: Inter, "Segoe UI", Arial, sans-serif;
+      background: #0b1220;
+      color: #e5e7eb;
+      min-height: 100vh;
+    }
+
+    .container {
+      max-width: 1250px;
+      margin: auto;
+      padding: 30px 24px;
+    }
+
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 15px;
+      margin-bottom: 30px;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .logo {
+      background: #2563eb;
+      padding: 12px;
+      border-radius: 12px;
+      font-size: 23px;
+    }
+
+    h1 {
+      font-size: 24px;
+      color: #fff;
+    }
+
+    .subtitle {
+      color: #94a3b8;
+      font-size: 13px;
+      margin-top: 5px;
+    }
+
+    .status {
+      padding: 9px 14px;
+      border-radius: 20px;
+      background: #123b2d;
+      color: #4ade80;
+      font-size: 13px;
+    }
+
+    .status.error {
+      background: #451c25;
+      color: #fca5a5;
+    }
+
+    .section-title {
+      font-size: 18px;
+      margin-bottom: 17px;
+      color: #fff;
+    }
+
+    .cards {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 16px;
+      margin-bottom: 25px;
+    }
+
+    .card, .panel {
+      background: #151f30;
+      border: 1px solid #253247;
+      border-radius: 14px;
+      padding: 21px;
+    }
+
+    .card-label {
+      font-size: 13px;
+      color: #94a3b8;
+      margin-bottom: 12px;
+    }
+
+    .card-value {
+      font-size: 25px;
+      font-weight: 700;
+      color: #fff;
+    }
+
+    .card-detail {
+      color: #64748b;
+      font-size: 12px;
+      margin-top: 8px;
+    }
+
+    .panel {
+      margin-bottom: 22px;
+    }
+
+    .panel-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 15px;
+      margin-bottom: 20px;
+    }
+
+    select, button {
+      background: #243249;
+      color: white;
+      border: 1px solid #3b4c65;
+      padding: 10px 14px;
+      border-radius: 8px;
+      font-size: 13px;
+    }
+
+    button {
+      background: #2563eb;
+      border: none;
+      cursor: pointer;
+      font-weight: 600;
+    }
+
+    button:hover {
+      background: #1d4ed8;
+    }
+
+    button:disabled {
+      opacity: .5;
+      cursor: wait;
+    }
+
+    .chart-container {
+      position: relative;
+      height: 360px;
+      width: 100%;
+    }
+
+    .table-wrapper {
+      overflow-x: auto;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      min-width: 600px;
+      font-size: 13px;
+    }
+
+    th, td {
+      padding: 14px;
+      text-align: left;
+      border-bottom: 1px solid #29364a;
+    }
+
+    th {
+      color: #94a3b8;
+      font-weight: 600;
+    }
+
+    td {
+      color: #e2e8f0;
+    }
+
+    .prediction-value {
+      color: #60a5fa;
+      font-weight: 700;
+    }
+
+    .footer {
+      text-align: center;
+      padding: 25px;
+      color: #64748b;
+      font-size: 12px;
+    }
+
+    .message {
+      display: none;
+      background: #451c25;
+      border: 1px solid #9f3545;
+      color: #fecaca;
+      padding: 14px;
+      border-radius: 9px;
+      margin-bottom: 20px;
+      font-size: 14px;
+    }
+
+    .loading {
+      color: #93c5fd;
+      font-size: 13px;
+      margin-bottom: 15px;
+    }
+
+    @media (max-width: 850px) {
+      .cards {
+        grid-template-columns: repeat(2, 1fr);
+      }
+    }
+
+    @media (max-width: 500px) {
+      .container {
+        padding: 20px 14px;
+      }
+
+      .cards {
+        grid-template-columns: 1fr 1fr;
+        gap: 9px;
+      }
+
+      .card {
+        padding: 14px;
+      }
+
+      .card-value {
+        font-size: 19px;
+      }
+
+      .chart-container {
+        height: 280px;
+      }
+    }
+  </style>
 </head>
+
 <body>
-  <h1>Pronóstico</h1>
-  <p id="estado">Consultando la API…</p>
-  <table border="1" cellpadding="4">
-    <thead><tr><th>tiempo (UTC)</th><th>prediccion</th><th>limite_inferior</th><th>limite_superior</th></tr></thead>
-    <tbody id="filas"></tbody>
-  </table>
+
+  <main class="container">
+
+    <header>
+      <div class="brand">
+        <div class="logo">⚡</div>
+        <div>
+          <h1>Energy Forecast</h1>
+          <p class="subtitle">Sistema inteligente de pronóstico eléctrico</p>
+        </div>
+      </div>
+
+      <div class="status" id="estado">● Conectando...</div>
+    </header>
+
+    <div id="mensaje" class="message"></div>
+    <p id="cargando" class="loading">Consultando información...</p>
+
+    <h2 class="section-title">Indicadores generales</h2>
+
+    <section class="cards">
+
+      <div class="card">
+        <p class="card-label">Próxima hora</p>
+        <p class="card-value" id="proxima">--</p>
+        <p class="card-detail">Consumo pronosticado</p>
+      </div>
+
+      <div class="card">
+        <p class="card-label">Máximo esperado</p>
+        <p class="card-value" id="maximo">--</p>
+        <p class="card-detail">En el periodo pronosticado</p>
+      </div>
+
+      <div class="card">
+        <p class="card-label">Último dato real</p>
+        <p class="card-value" id="ultimo">--</p>
+        <p class="card-detail">Hora de Colombia</p>
+      </div>
+
+      <div class="card">
+        <p class="card-label">Error MAPE</p>
+        <p class="card-value" id="mape">--</p>
+        <p class="card-detail">Evaluación del modelo</p>
+      </div>
+
+    </section>
+
+    <section class="panel">
+
+      <div class="panel-header">
+        <div>
+          <h2 class="section-title">Histórico y pronóstico</h2>
+          <p class="subtitle">
+            Consumo real, predicción e intervalo de confianza del 95 %
+          </p>
+        </div>
+
+        <div>
+          <select id="horas">
+            <option value="6">Próximas 6 horas</option>
+            <option value="12" selected>Próximas 12 horas</option>
+            <option value="24">Próximas 24 horas</option>
+          </select>
+
+          <button id="actualizar" onclick="cargar()">
+            Actualizar
+          </button>
+        </div>
+      </div>
+
+      <div class="chart-container">
+        <canvas id="grafica"></canvas>
+      </div>
+
+    </section>
+
+    <section class="panel">
+      <div class="panel-header">
+        <div>
+          <h2 class="section-title">Detalle de predicciones</h2>
+          <p class="subtitle">Valores estimados por el modelo SARIMA</p>
+        </div>
+      </div>
+
+      <div class="table-wrapper">
+        <table>
+          <thead>
+            <tr>
+              <th>Fecha y hora (Colombia)</th>
+              <th>Predicción</th>
+              <th>Límite inferior</th>
+              <th>Límite superior</th>
+            </tr>
+          </thead>
+          <tbody id="filas"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2 class="section-title">Información del modelo</h2>
+      <div class="cards">
+        <div>
+          <p class="card-label">Modelo</p>
+          <p class="card-value">SARIMA</p>
+        </div>
+        <div>
+          <p class="card-label">Variable</p>
+          <p class="card-value" style="font-size:17px">Consumo_total</p>
+        </div>
+        <div>
+          <p class="card-label">Observaciones</p>
+          <p class="card-value" id="observaciones">720</p>
+        </div>
+        <div>
+          <p class="card-label">Estacionalidad</p>
+          <p class="card-value">24 horas</p>
+        </div>
+      </div>
+    </section>
+
+    <footer class="footer">
+      Sistema de pronóstico eléctrico · FastAPI · InfluxDB · SARIMA
+      <br>
+      Horario de referencia: Colombia (UTC-5)
+    </footer>
+
+  </main>
 
 <script>
-async function cargar() {
-  const estado = document.getElementById("estado");
-  try {
-    const respuesta = await fetch("/api/prediccion?horas=12&historia=48");
+  let grafica = null;
+
+  const formatoHora = fecha =>
+    new Intl.DateTimeFormat("es-CO", {
+      timeZone: "America/Bogota",
+      day: "2-digit",
+      month: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false
+    }).format(new Date(fecha));
+
+  const formatoNumero = valor =>
+    Number(valor).toLocaleString("es-CO", {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
+    });
+
+  async function consultar(url) {
+    const respuesta = await fetch(url);
     const datos = await respuesta.json();
-    if (!respuesta.ok) throw new Error(datos.detail);
 
-    // datos.historico  -> [{tiempo, valor}, ...]            (horas pasadas)
-    // datos.prediccion -> [{tiempo, prediccion, limite_inferior, limite_superior}, ...]
-    console.log(datos);   // abre la consola del navegador (F12) para explorarlo
+    if (!respuesta.ok) {
+      throw new Error(datos.detail || "No se pudo consultar la API");
+    }
 
-    document.getElementById("filas").innerHTML = datos.prediccion.map(p =>
-      `<tr><td>${p.tiempo}</td><td>${p.prediccion}</td><td>${p.limite_inferior}</td><td>${p.limite_superior}</td></tr>`
-    ).join("");
-    estado.textContent = `Último dato real: ${datos.ultima_observacion}`;
-  } catch (error) {
-    estado.textContent = "Error: " + error.message;
+    return datos;
   }
-}
-cargar();
+
+  function mostrarTabla(predicciones) {
+    const filas = document.getElementById("filas");
+    filas.innerHTML = "";
+
+    predicciones.forEach(p => {
+      const tr = document.createElement("tr");
+
+      [
+        formatoHora(p.tiempo),
+        formatoNumero(p.prediccion),
+        formatoNumero(p.limite_inferior),
+        formatoNumero(p.limite_superior)
+      ].forEach((valor, indice) => {
+        const td = document.createElement("td");
+        td.textContent = valor;
+
+        if (indice === 1) {
+          td.className = "prediction-value";
+        }
+
+        tr.appendChild(td);
+      });
+
+      filas.appendChild(tr);
+    });
+  }
+
+  function mostrarGrafica(historico, predicciones) {
+    const puntos = [
+      ...historico.map(p => ({
+        tiempo: p.tiempo,
+        valor: p.valor,
+        tipo: "historico"
+      })),
+      ...predicciones.map(p => ({
+        tiempo: p.tiempo,
+        tipo: "prediccion"
+      }))
+    ];
+
+    const mapa = new Map();
+    puntos.forEach(p => mapa.set(p.tiempo, p));
+
+    const etiquetas = [...mapa.keys()].sort(
+      (a, b) => new Date(a) - new Date(b)
+    );
+
+    const ultimo = historico[historico.length - 1];
+
+    const valoresHistoricos = etiquetas.map(t => {
+      const p = mapa.get(t);
+      return p.tipo === "historico" ? p.valor : null;
+    });
+
+    // Se usa el último dato real como punto de unión
+    // entre la serie histórica y la predicción.
+    const valoresPrediccion = etiquetas.map(t => {
+      if (t === ultimo.tiempo) return ultimo.valor;
+
+      const p = predicciones.find(x => x.tiempo === t);
+      return p ? p.prediccion : null;
+    });
+
+    const inferiores = etiquetas.map(t => {
+      const p = predicciones.find(x => x.tiempo === t);
+      return p ? p.limite_inferior : null;
+    });
+
+    const superiores = etiquetas.map(t => {
+      const p = predicciones.find(x => x.tiempo === t);
+      return p ? p.limite_superior : null;
+    });
+
+    if (grafica) {
+      grafica.destroy();
+    }
+
+    grafica = new Chart(
+      document.getElementById("grafica"),
+      {
+        type: "line",
+
+        data: {
+          labels: etiquetas.map(formatoHora),
+
+          datasets: [
+            {
+              label: "Consumo histórico",
+              data: valoresHistoricos,
+              borderColor: "#38bdf8",
+              backgroundColor: "#38bdf8",
+              borderWidth: 2,
+              pointRadius: 2,
+              tension: 0.3,
+              spanGaps: false
+            },
+            {
+              label: "Predicción SARIMA",
+              data: valoresPrediccion,
+              borderColor: "#a78bfa",
+              backgroundColor: "#a78bfa",
+              borderWidth: 3,
+              pointRadius: 3,
+              tension: 0.3,
+              spanGaps: false
+            },
+            {
+              label: "Límite inferior",
+              data: inferiores,
+              borderWidth: 0,
+              pointRadius: 0,
+              fill: false
+            },
+            {
+              label: "Intervalo de confianza",
+              data: superiores,
+              borderWidth: 0,
+              pointRadius: 0,
+              backgroundColor: "rgba(167,139,250,0.15)",
+              fill: "-1"
+            }
+          ]
+        },
+
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+
+          interaction: {
+            intersect: false,
+            mode: "index"
+          },
+
+          plugins: {
+            legend: {
+              labels: {
+                color: "#cbd5e1",
+                filter: item => item.text !== "Límite inferior"
+              }
+            }
+          },
+
+          scales: {
+            x: {
+              ticks: { color: "#94a3b8", maxTicksLimit: 10 },
+              grid: { color: "rgba(148,163,184,0.08)" }
+            },
+            y: {
+              title: {
+                display: true,
+                text: "Consumo",
+                color: "#94a3b8"
+              },
+              ticks: { color: "#94a3b8" },
+              grid: { color: "rgba(148,163,184,0.08)" }
+            }
+          }
+        }
+      }
+    );
+  }
+
+  async function cargar() {
+    const estado = document.getElementById("estado");
+    const mensaje = document.getElementById("mensaje");
+    const cargando = document.getElementById("cargando");
+    const boton = document.getElementById("actualizar");
+
+    estado.textContent = "● Actualizando...";
+    estado.className = "status";
+    mensaje.style.display = "none";
+    cargando.textContent = "Consultando información...";
+    boton.disabled = true;
+
+    try {
+      const horas = document.getElementById("horas").value;
+
+      const [datos, modelo] = await Promise.all([
+        consultar(
+          `/api/prediccion?horas=${horas}&historia=48&confianza=0.95`
+        ),
+        consultar("/api/modelo")
+      ]);
+
+      if (!datos.historico?.length || !datos.prediccion?.length) {
+        throw new Error("La API no devolvió datos suficientes.");
+      }
+
+      const predicciones = datos.prediccion;
+      const historico = datos.historico;
+
+      document.getElementById("proxima").textContent =
+        formatoNumero(predicciones[0].prediccion);
+
+      const maximo = Math.max(
+        ...predicciones.map(p => p.prediccion)
+      );
+
+      document.getElementById("maximo").textContent =
+        formatoNumero(maximo);
+
+      document.getElementById("ultimo").textContent =
+        formatoHora(datos.ultima_observacion);
+
+      document.getElementById("mape").textContent =
+        modelo.metricas_test?.["MAPE_%"] != null
+          ? formatoNumero(modelo.metricas_test["MAPE_%"]) + "%"
+          : "--";
+
+      document.getElementById("observaciones").textContent =
+        modelo.n_observaciones ?? "--";
+
+      mostrarTabla(predicciones);
+      mostrarGrafica(historico, predicciones);
+
+      estado.textContent = "● Sistema operativo";
+      cargando.textContent =
+        `Pronóstico actualizado. ${predicciones.length} horas calculadas.`;
+
+    } catch (error) {
+      estado.textContent = "● Error de conexión";
+      estado.className = "status error";
+      mensaje.textContent = "No fue posible cargar los datos: " + error.message;
+      mensaje.style.display = "block";
+      cargando.textContent = "Intenta actualizar nuevamente.";
+
+      console.error(error);
+
+    } finally {
+      boton.disabled = false;
+    }
+  }
+
+  cargar();
 </script>
+
 </body>
 </html>
