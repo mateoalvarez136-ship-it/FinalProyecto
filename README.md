@@ -283,7 +283,7 @@ Sube tus archivos:
 git add Dockerfile .dockerignore README.md
 git commit -m "Contenerización del servicio"
 git push
-```
+```jn
 
 **✅ Checklist Fase 4**
 - [ ] `docker build` termina sin errores.
@@ -338,3 +338,10 @@ Reglas: nunca muestres el token; la terminal y el navegador deben leerse bien; s
 ## Al terminar cada sesión
 
 Detén la API con **Ctrl + C**. El Codespace se detiene solo tras 30 minutos sin actividad. Tu cuota gratuita es de **60 horas al mes** con la máquina de 2 núcleos. Revisa tu consumo en **github.com/settings/billing → Usage**, filtrando por Codespaces.
+## 8. Video de evidencia
+
+En el siguiente enlace se encuentra el video de evidencia del funcionamiento del proyecto, incluyendo la ejecución sin Docker y con Docker.
+
+[Ver video de evidencia en Google Drive](https://drive.google.com/drive/folders/1IwSN4JAPXHhcvvuYOUFBYe8-Cev5Suel?usp=drive_link)
+
+
